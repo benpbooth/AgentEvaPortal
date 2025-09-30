@@ -21,7 +21,6 @@ class RetrievalService:
 
     # Class-level Pinecone client (shared across instances)
     _pinecone_client: Optional[Pinecone] = None
-    _index_name = "agenteva-knowledge"
 
     def __init__(self, tenant_id: str):
         """
@@ -32,6 +31,7 @@ class RetrievalService:
         """
         self.tenant_id = tenant_id
         settings = get_settings()
+        self._index_name = settings.pinecone_index_name  # Use index name from settings
         self.openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
 
         # Initialize Pinecone client (singleton pattern)
@@ -95,7 +95,7 @@ class RetrievalService:
         self,
         query: str,
         top_k: int = 5,
-        score_threshold: float = 0.7
+        score_threshold: float = 0.3  # Lowered threshold for better recall
     ) -> List[Dict[str, Any]]:
         """
         Search knowledge base for relevant documents using vector similarity.
