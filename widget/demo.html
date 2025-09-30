@@ -164,8 +164,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🤖 AgentEva Widget Demo</h1>
-        <p class="subtitle">Embeddable AI-powered customer support for your website</p>
+        <h1>🏖️ Five Star Gulf Rentals</h1>
+        <p class="subtitle">Your Dream Vacation Awaits in Destin & 30A</p>
 
         <div class="section">
             <h2>What is AgentEva?</h2>
@@ -257,9 +257,14 @@
         </div>
     </div>
 
-    <!-- AgentEva Widget - This is what your clients will add to their websites -->
-    <script src="widget.js"
-            data-tenant="demo"
-            data-api-key="dem_live_nUw5urvXzJvOuquM0cOh_NE8z1BzXTvJ_AcV_X-RDBA"></script>
+    <!-- AgentEva Widget Integration -->
+    <script src="http://127.0.0.1:8000/widget/agenteva-widget.js"></script>
+    <script>
+        AgentEva.init({
+            apiUrl: 'http://127.0.0.1:8000',
+            tenantId: 'fivestar',
+            apiKey: 'fiv_live_5eVj2YdY7j6VY8l5Z0PijgiV6FwnGxQ9'
+        });
+    </script>
 </body>
 </html>
