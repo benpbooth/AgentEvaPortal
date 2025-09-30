@@ -119,6 +119,11 @@ widget_path = Path(__file__).parent.parent.parent / "widget"
 if widget_path.exists():
     app.mount("/widget", StaticFiles(directory=str(widget_path)), name="widget")
 
+# Serve dashboard files
+dashboard_path = Path(__file__).parent.parent.parent / "dashboard"
+if dashboard_path.exists():
+    app.mount("/dashboard", StaticFiles(directory=str(dashboard_path), html=True), name="dashboard")
+
 
 if __name__ == "__main__":
     uvicorn.run(

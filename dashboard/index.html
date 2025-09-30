@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Five Star Gulf Rentals - Agent Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-content">
+                <h1>Five Star Gulf Rentals</h1>
+                <p class="subtitle">Agent Dashboard</p>
+            </div>
+        </header>
+
+        <!-- Stats Cards -->
+        <section class="stats-section">
+            <div class="stat-card">
+                <div class="stat-content">
+                    <p class="stat-label">Total Conversations</p>
+                    <h3 id="total-conversations">-</h3>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-content">
+                    <p class="stat-label">Active Conversations</p>
+                    <h3 id="active-conversations">-</h3>
+                </div>
+            </div>
+
+            <div class="stat-card warning">
+                <div class="stat-content">
+                    <p class="stat-label">Escalated</p>
+                    <h3 id="escalated-conversations">-</h3>
+                </div>
+            </div>
+
+            <div class="stat-card success">
+                <div class="stat-content">
+                    <p class="stat-label">Resolved</p>
+                    <h3 id="resolved-conversations">-</h3>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-content">
+                    <p class="stat-label">Escalation Rate</p>
+                    <h3 id="escalation-rate">-</h3>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-content">
+                    <p class="stat-label">Total Messages</p>
+                    <h3 id="total-messages">-</h3>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filters -->
+        <section class="filters-section">
+            <div class="filter-group">
+                <label for="status-filter">Filter by Status</label>
+                <select id="status-filter">
+                    <option value="">All Conversations</option>
+                    <option value="active">Active</option>
+                    <option value="escalated">Escalated</option>
+                    <option value="resolved">Resolved</option>
+                </select>
+            </div>
+            <button id="refresh-btn" class="refresh-btn">Refresh</button>
+        </section>
+
+        <!-- Conversations List -->
+        <section class="conversations-section">
+            <h2>Conversations</h2>
+            <div class="conversations-container">
+                <div id="conversations-list" class="conversations-list">
+                    <!-- Conversations will be loaded here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Conversation Detail Modal -->
+        <div id="conversation-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Conversation Details</h2>
+                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="conversation-meta">
+                        <div class="meta-item">
+                            <strong>Session ID:</strong>
+                            <span id="modal-session-id"></span>
+                        </div>
+                        <div class="meta-item">
+                            <strong>Channel:</strong>
+                            <span id="modal-channel"></span>
+                        </div>
+                        <div class="meta-item">
+                            <strong>Status:</strong>
+                            <span id="modal-status" class="status-badge"></span>
+                        </div>
+                        <div class="meta-item">
+                            <strong>Started:</strong>
+                            <span id="modal-started"></span>
+                        </div>
+                    </div>
+                    <div class="messages-container" id="modal-messages">
+                        <!-- Messages will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loading-spinner" class="loading-spinner" style="display: none;">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>

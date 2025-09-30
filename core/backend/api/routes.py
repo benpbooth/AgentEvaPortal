@@ -556,3 +556,512 @@ async def get_widget_config(
         branding=branding,
         features=features
     )
+
+
+# ============================================================================
+# Dashboard Endpoints (Internal Use)
+# ============================================================================
+
+@router.get(
+    "/{tenant_id}/dashboard/conversations",
+    tags=["Dashboard"],
+    summary="List conversations for dashboard",
+    description="Get all conversations with pagination and filtering"
+)
+async def list_conversations(
+    tenant_id: str,
+    x_api_key: Optional[str] = Header(None),
+    status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    """
+    List conversations for agent dashboard.
+
+    Args:
+        tenant_id: Tenant identifier
+        x_api_key: API key for authentication
+        status: Filter by status (active, escalated, resolved)
+        limit: Number of conversations to return
+        offset: Pagination offset
+        db: Database session
+
+    Returns:
+        List of conversations with message counts
+    """
+    from core.database.models import Conversation, Message
+    from sqlalchemy import func, desc
+
+    tenant = await verify_api_key_and_get_tenant(tenant_id, x_api_key, db)
+
+    logger.info(f"Dashboard conversations list for tenant: {tenant_id}")
+
+    # Build query
+    query = db.query(
+        Conversation,
+        func.count(Message.id).label('message_count')
+    ).outerjoin(
+        Message, Message.conversation_id == Conversation.id
+    ).filter(
+        Conversation.tenant_id == tenant.id
+    ).group_by(Conversation.id)
+
+    # Apply status filter
+    if status:
+        from core.database.models import ResolutionStatus
+        if status == "escalated":
+            query = query.filter(Conversation.escalated == True)
+        elif status == "resolved":
+            query = query.filter(Conversation.resolution_status == ResolutionStatus.RESOLVED)
+        elif status == "active":
+            query = query.filter(Conversation.resolution_status == ResolutionStatus.PENDING)
+
+    # Order and paginate
+    query = query.order_by(desc(Conversation.started_at))
+    conversations = query.offset(offset).limit(limit).all()
+
+    # Format response
+    return {
+        "conversations": [
+            {
+                "id": str(conv.id),
+                "session_id": conv.session_id,
+                "channel": conv.channel,
+                "status": conv.resolution_status.value if conv.resolution_status else "unknown",
+                "escalated": conv.escalated,
+                "message_count": count,
+                "started_at": conv.started_at.isoformat(),
+                "ended_at": conv.ended_at.isoformat() if conv.ended_at else None
+            }
+            for conv, count in conversations
+        ],
+        "total": query.count(),
+        "limit": limit,
+        "offset": offset
+    }
+
+
+@router.get(
+    "/{tenant_id}/dashboard/conversations/{conversation_id}",
+    tags=["Dashboard"],
+    summary="Get conversation details",
+    description="Get full conversation with all messages"
+)
+async def get_conversation_detail(
+    tenant_id: str,
+    conversation_id: UUID,
+    x_api_key: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Get detailed conversation with all messages.
+
+    Args:
+        tenant_id: Tenant identifier
+        conversation_id: Conversation UUID
+        x_api_key: API key
+        db: Database session
+
+    Returns:
+        Conversation with full message history
+    """
+    from core.database.models import Conversation, Message
+
+    tenant = await verify_api_key_and_get_tenant(tenant_id, x_api_key, db)
+
+    # Get conversation
+    conversation = db.query(Conversation).filter(
+        Conversation.id == conversation_id,
+        Conversation.tenant_id == tenant.id
+    ).first()
+
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found"
+        )
+
+    # Get messages
+    messages = db.query(Message).filter(
+        Message.conversation_id == conversation_id
+    ).order_by(Message.created_at).all()
+
+    return {
+        "id": str(conversation.id),
+        "session_id": conversation.session_id,
+        "channel": conversation.channel,
+        "status": conversation.resolution_status.value if conversation.resolution_status else "unknown",
+        "escalated": conversation.escalated,
+        "started_at": conversation.started_at.isoformat(),
+        "ended_at": conversation.ended_at.isoformat() if conversation.ended_at else None,
+        "messages": [
+            {
+                "id": str(msg.id),
+                "role": msg.role.value,
+                "content": msg.content,
+                "metadata": msg.extra_data or {},
+                "created_at": msg.created_at.isoformat()
+            }
+            for msg in messages
+        ]
+    }
+
+
+@router.get(
+    "/{tenant_id}/dashboard/stats",
+    tags=["Dashboard"],
+    summary="Get dashboard statistics",
+    description="Get summary stats for the dashboard"
+)
+async def get_dashboard_stats(
+    tenant_id: str,
+    x_api_key: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Get dashboard statistics.
+
+    Args:
+        tenant_id: Tenant identifier
+        x_api_key: API key
+        db: Database session
+
+    Returns:
+        Summary statistics
+    """
+    from core.database.models import Conversation, Message, ResolutionStatus
+    from sqlalchemy import func
+    from datetime import datetime, timedelta
+
+    tenant = await verify_api_key_and_get_tenant(tenant_id, x_api_key, db)
+
+    # Total conversations
+    total_conversations = db.query(func.count(Conversation.id)).filter(
+        Conversation.tenant_id == tenant.id
+    ).scalar()
+
+    # Escalated conversations
+    escalated_count = db.query(func.count(Conversation.id)).filter(
+        Conversation.tenant_id == tenant.id,
+        Conversation.escalated == True
+    ).scalar()
+
+    # Active conversations
+    active_count = db.query(func.count(Conversation.id)).filter(
+        Conversation.tenant_id == tenant.id,
+        Conversation.resolution_status == ResolutionStatus.PENDING
+    ).scalar()
+
+    # Resolved conversations
+    resolved_count = db.query(func.count(Conversation.id)).filter(
+        Conversation.tenant_id == tenant.id,
+        Conversation.resolution_status == ResolutionStatus.RESOLVED
+    ).scalar()
+
+    # Total messages
+    total_messages = db.query(func.count(Message.id)).filter(
+        Message.tenant_id == tenant.id
+    ).scalar()
+
+    # Conversations today
+    today = datetime.utcnow().date()
+    today_count = db.query(func.count(Conversation.id)).filter(
+        Conversation.tenant_id == tenant.id,
+        func.date(Conversation.started_at) == today
+    ).scalar()
+
+    return {
+        "total_conversations": total_conversations or 0,
+        "active_conversations": active_count or 0,
+        "escalated_conversations": escalated_count or 0,
+        "resolved_conversations": resolved_count or 0,
+        "total_messages": total_messages or 0,
+        "conversations_today": today_count or 0,
+        "escalation_rate": round((escalated_count / total_conversations * 100) if total_conversations > 0 else 0, 1)
+    }
+
+
+@router.post(
+    "/{tenant_id}/sms/webhook",
+    tags=["SMS"],
+    summary="Twilio SMS webhook",
+    description="Receive incoming SMS messages from Twilio"
+)
+async def sms_webhook(
+    tenant_id: str,
+    From: str = Form(...),
+    To: str = Form(...),
+    Body: str = Form(...),
+    MessageSid: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Twilio webhook endpoint for incoming SMS messages.
+
+    Args:
+        tenant_id: Tenant identifier
+        From: Sender phone number
+        To: Recipient phone number (your Twilio number)
+        Body: SMS message body
+        MessageSid: Twilio message SID
+        db: Database session
+
+    Returns:
+        TwiML response
+    """
+    from fastapi import Form, Response
+    from core.backend.services.sms_service import SMSService
+
+    logger.info(f"Received SMS from {From} to {To}: {Body}")
+
+    try:
+        # Get tenant
+        tenant = db.query(Tenant).filter(Tenant.slug == tenant_id).first()
+        if not tenant:
+            logger.error(f"Tenant {tenant_id} not found")
+            return Response(content=SMSService.create_twiml_response("Service unavailable"), media_type="application/xml")
+
+        # Get or create conversation using phone number as session ID
+        from core.database.models import Conversation, Message, MessageRole
+        conversation = db.query(Conversation).filter(
+            Conversation.tenant_id == tenant.id,
+            Conversation.session_id == From,
+            Conversation.channel == "sms"
+        ).first()
+
+        if not conversation:
+            conversation = Conversation(
+                id=uuid4(),
+                tenant_id=tenant.id,
+                session_id=From,
+                channel="sms"
+            )
+            db.add(conversation)
+            db.commit()
+            logger.info(f"Created new SMS conversation for {From}")
+
+        # Save user message
+        user_message = Message(
+            id=uuid4(),
+            conversation_id=conversation.id,
+            tenant_id=tenant.id,
+            role=MessageRole.USER,
+            content=Body,
+            extra_data={"channel": "sms", "message_sid": MessageSid, "from": From, "to": To}
+        )
+        db.add(user_message)
+        db.commit()
+
+        # Generate AI response
+        chat_service = ChatService(tenant_id, db)
+        ai_response = await chat_service.generate_response(Body, From)
+
+        # Save assistant message
+        assistant_message = Message(
+            id=uuid4(),
+            conversation_id=conversation.id,
+            tenant_id=tenant.id,
+            role=MessageRole.ASSISTANT,
+            content=ai_response["message"],
+            extra_data={
+                "channel": "sms",
+                "confidence": ai_response.get("confidence", 0),
+                "escalation_triggered": ai_response.get("escalation_triggered", False),
+                "documents_used": ai_response.get("documents_used", 0)
+            }
+        )
+        db.add(assistant_message)
+
+        # Update conversation escalation status
+        if ai_response.get("escalation_triggered"):
+            conversation.escalated = True
+
+        db.commit()
+
+        logger.info(f"SMS response generated for {From}")
+
+        # Return TwiML response
+        return Response(
+            content=SMSService.create_twiml_response(ai_response["message"]),
+            media_type="application/xml"
+        )
+
+    except Exception as e:
+        logger.error(f"Error processing SMS webhook: {str(e)}")
+        db.rollback()
+        return Response(
+            content=SMSService.create_twiml_response("Sorry, we're experiencing technical difficulties. Please try again later."),
+            media_type="application/xml"
+        )
+
+
+# =======================
+# VOICE ENDPOINTS (ElevenLabs)
+# =======================
+
+@router.post(
+    "/{tenant_id}/voice/knowledge",
+    tags=["Voice"],
+    summary="ElevenLabs knowledge base webhook",
+    description="Retrieve knowledge base information during voice calls"
+)
+async def voice_knowledge_webhook(
+    tenant_id: str,
+    request: Dict[str, Any],
+    db: Session = Depends(get_db)
+):
+    """
+    ElevenLabs webhook endpoint for knowledge base retrieval during calls.
+
+    Args:
+        tenant_id: Tenant identifier
+        request: JSON payload with query
+        db: Database session
+
+    Returns:
+        JSON response with knowledge base answer
+    """
+    from core.backend.services.voice_service import VoiceService
+
+    query = request.get("query", "")
+    conversation_id = request.get("conversation_id", "")
+    caller_phone = request.get("caller_phone", "")
+
+    logger.info(f"Voice knowledge request from {caller_phone}: {query}")
+
+    try:
+        # Get tenant
+        tenant = db.query(Tenant).filter(Tenant.slug == tenant_id).first()
+        if not tenant:
+            logger.error(f"Tenant {tenant_id} not found")
+            return {
+                "response": "Service unavailable",
+                "metadata": {"error": "tenant_not_found"}
+            }
+
+        # Generate AI response using knowledge base
+        chat_service = ChatService(tenant_id, db)
+        ai_response = await chat_service.generate_response(query, caller_phone)
+
+        # Format response for ElevenLabs
+        voice_service = VoiceService(
+            api_key=tenant.config.get("elevenlabs", {}).get("api_key", ""),
+            agent_id=tenant.config.get("elevenlabs", {}).get("agent_id", "")
+        )
+
+        formatted_response = voice_service.format_knowledge_base_response(
+            query=query,
+            answer=ai_response["message"],
+            documents=ai_response.get("documents", []),
+            confidence=ai_response.get("confidence", 0)
+        )
+
+        logger.info(f"Voice knowledge response generated for {caller_phone}")
+        return formatted_response
+
+    except Exception as e:
+        logger.error(f"Error processing voice knowledge webhook: {str(e)}")
+        return {
+            "response": "I apologize, but I'm having trouble accessing that information right now. Please try again or speak with our team directly.",
+            "metadata": {"error": str(e)}
+        }
+
+
+@router.post(
+    "/{tenant_id}/voice/transcript",
+    tags=["Voice"],
+    summary="ElevenLabs conversation logging webhook",
+    description="Log voice conversation transcripts"
+)
+async def voice_transcript_webhook(
+    tenant_id: str,
+    request: Dict[str, Any],
+    db: Session = Depends(get_db)
+):
+    """
+    ElevenLabs webhook endpoint for logging call transcripts.
+
+    Args:
+        tenant_id: Tenant identifier
+        request: JSON payload with transcript data
+        db: Database session
+
+    Returns:
+        Success confirmation
+    """
+    from core.backend.services.voice_service import VoiceService
+    from core.database.models import Conversation, Message, MessageRole
+
+    conversation_id = request.get("conversation_id", "")
+    caller_phone = request.get("caller_phone", "")
+    messages = request.get("messages", [])
+    duration_seconds = request.get("duration_seconds")
+
+    logger.info(f"Voice transcript received for {caller_phone}: {len(messages)} messages")
+
+    try:
+        # Get tenant
+        tenant = db.query(Tenant).filter(Tenant.slug == tenant_id).first()
+        if not tenant:
+            logger.error(f"Tenant {tenant_id} not found")
+            return {"success": False, "error": "tenant_not_found"}
+
+        # Get or create conversation
+        conversation = db.query(Conversation).filter(
+            Conversation.tenant_id == tenant.id,
+            Conversation.session_id == caller_phone,
+            Conversation.channel == "voice"
+        ).first()
+
+        if not conversation:
+            conversation = Conversation(
+                id=uuid4(),
+                tenant_id=tenant.id,
+                session_id=caller_phone,
+                channel="voice"
+            )
+            db.add(conversation)
+            db.commit()
+            logger.info(f"Created new voice conversation for {caller_phone}")
+
+        # Save all messages from transcript
+        for msg in messages:
+            role = MessageRole.USER if msg.get("role") == "user" else MessageRole.ASSISTANT
+
+            message = Message(
+                id=uuid4(),
+                conversation_id=conversation.id,
+                tenant_id=tenant.id,
+                role=role,
+                content=msg.get("content", ""),
+                extra_data={
+                    "channel": "voice",
+                    "timestamp": msg.get("timestamp"),
+                    "conversation_id": conversation_id,
+                    "caller_phone": caller_phone
+                }
+            )
+            db.add(message)
+
+        # Update conversation metadata
+        conversation.extra_data = {
+            "elevenlabs_conversation_id": conversation_id,
+            "duration_seconds": duration_seconds,
+            "caller_phone": caller_phone
+        }
+
+        db.commit()
+
+        logger.info(f"Voice transcript saved for {caller_phone}: {len(messages)} messages")
+
+        return {
+            "success": True,
+            "conversation_id": str(conversation.id),
+            "messages_saved": len(messages)
+        }
+
+    except Exception as e:
+        logger.error(f"Error processing voice transcript webhook: {str(e)}")
+        db.rollback()
+        return {"success": False, "error": str(e)}
