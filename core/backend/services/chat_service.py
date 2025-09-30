@@ -11,11 +11,30 @@ from sqlalchemy.orm import Session
 from core.backend.config import get_settings
 from core.backend.services.database_service import DatabaseService
 from core.backend.services.retrieval_service import RetrievalService
-from core.database.models import MessageRole, ResolutionStatus
-from core.shared.config_loader import TenantConfig
+from core.database.models import MessageRole, ResolutionStatus, Tenant
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+class TenantConfigHelper:
+    """Helper class to access tenant config from database with dot notation."""
+
+    def __init__(self, config_dict: dict):
+        self._config = config_dict or {}
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get config value using dot notation (e.g., 'ai.model')."""
+        keys = key.split(".")
+        value = self._config
+
+        for k in keys:
+            if isinstance(value, dict) and k in value:
+                value = value[k]
+            else:
+                return default
+
+        return value
 
 
 class ChatService:
@@ -42,8 +61,13 @@ class ChatService:
         self.tenant_id = tenant_id
         self.db = db
 
-        # Load tenant configuration
-        self.config = TenantConfig(tenant_id)
+        # Load tenant from database
+        tenant = db.query(Tenant).filter(Tenant.slug == tenant_id).first()
+        if not tenant:
+            raise ValueError(f"Tenant {tenant_id} not found")
+
+        # Load tenant configuration from database
+        self.config = TenantConfigHelper(tenant.config or {})
         logger.info(f"Loaded configuration for tenant: {tenant_id}")
 
         # Initialize OpenAI client
@@ -198,9 +222,10 @@ class ChatService:
         """
         try:
             # Get AI configuration from tenant settings
-            model = self.config.get("ai.model", "gpt-4o-mini")
-            temperature = self.config.get("ai.temperature", 0.7)
-            max_tokens = self.config.get("ai.max_tokens", 500)
+            ai_config = self.config.get("ai_config", {})
+            model = ai_config.get("model", "gpt-4o-mini")
+            temperature = ai_config.get("temperature", 0.7)
+            max_tokens = ai_config.get("max_tokens", 500)
 
             # Build system prompt
             system_prompt = self._build_system_prompt(context)
@@ -245,11 +270,14 @@ class ChatService:
         except Exception as e:
             logger.error(f"OpenAI API error: {e}", exc_info=True)
             # Return fallback response
-            fallback_responses = self.config.get(
-                "ai.fallback_responses",
+            ai_config = self.config.get("ai_config", {})
+            fallback_responses = ai_config.get(
+                "fallback_responses",
                 ["I'm having trouble processing that right now. Please try again or contact support."]
             )
-            return fallback_responses[0], 0.5
+            if isinstance(fallback_responses, list) and fallback_responses:
+                return fallback_responses[0], 0.5
+            return "I'm having trouble processing that right now. Please try again or contact support.", 0.5
 
     def _build_system_prompt(self, context: str) -> str:
         """
@@ -262,20 +290,18 @@ class ChatService:
             Complete system prompt
         """
         # Get base prompt from config
-        base_prompt = self.config.get("ai.system_prompt", "You are a helpful customer support assistant.")
+        ai_config = self.config.get("ai_config", {})
+        base_prompt = ai_config.get("system_prompt", "You are a helpful customer support assistant.")
 
-        # Replace variables
-        business_name = self.config.get("business.name", self.tenant_id)
-        business_phone = self.config.get("business.phone", "")
-        business_email = self.config.get("business.email", "")
-        business_hours = self.config.get("business.hours.monday", "9AM-5PM")
+        # Get business info
+        branding = self.config.get("branding", {})
+        business_name = branding.get("company_name", self.tenant_id)
+        business_email = branding.get("support_email", "")
 
-        prompt = base_prompt.format(
-            business_name=business_name,
-            business_phone=business_phone,
-            business_email=business_email,
-            business_hours=business_hours
-        )
+        # Build prompt (simple version without format placeholders to avoid KeyErrors)
+        prompt = f"{base_prompt}\n\nCompany: {business_name}"
+        if business_email:
+            prompt += f"\nSupport Email: {business_email}"
 
         # Append context if available
         if context:
@@ -301,7 +327,8 @@ class ChatService:
             True if should escalate, False otherwise
         """
         # Check 1: Escalation keywords
-        keywords = self.config.get("business.escalation.keywords", [])
+        ai_config = self.config.get("ai_config", {})
+        keywords = ai_config.get("escalation_keywords", [])
         combined_text = f"{user_message} {ai_response}".lower()
 
         for keyword in keywords:
@@ -309,18 +336,13 @@ class ChatService:
                 logger.info(f"Escalation triggered by keyword: {keyword}")
                 return True
 
-        # Check 2: Conversation length threshold
-        message_threshold = self.config.get("business.escalation.message_threshold", 999)
+        # Check 2: Conversation length threshold (disabled by default)
+        message_threshold = 999  # Very high threshold by default
         message_count = len(conversation.messages) if hasattr(conversation, 'messages') else 0
 
         if message_count >= message_threshold:
             logger.info(f"Escalation triggered by message count: {message_count}")
             return True
-
-        # Check 3: Low confidence (if we had confidence score from OpenAI)
-        # confidence_threshold = self.config.get("business.escalation.confidence_threshold", 0.6)
-        # if confidence < confidence_threshold:
-        #     return True
 
         return False
 

@@ -14,7 +14,6 @@ from core.backend.services.database_service import DatabaseService
 from core.backend.utils.security import verify_api_key, hash_api_key
 from core.database.base import get_db
 from core.database.models import Tenant, KnowledgeDoc
-from core.shared.config_loader import TenantConfig
 
 logger = logging.getLogger(__name__)
 
@@ -253,15 +252,15 @@ async def get_tenant_config(
     logger.info(f"Config request for tenant: {tenant_id}")
 
     try:
-        # Load tenant configuration
-        config = TenantConfig(tenant_id)
+        # Get configuration from database
+        config = tenant.config or {}
 
         return TenantConfigResponse(
             slug=tenant_id,
-            name=config.get("tenant.name", tenant.name),
-            branding=config.branding,
-            features=config.features,
-            business_info=config.business_info,
+            name=tenant.name,
+            branding=config.get('branding', {}),
+            features=config.get('channels', {}),
+            business_info=config.get('business_info', {}),
         )
 
     except Exception as e:

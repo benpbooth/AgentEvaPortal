@@ -90,13 +90,6 @@ public/uploads/
 .dockerignore
 docker-compose.override.yml
 
-# Tenant-specific sensitive files - NEVER COMMIT
-tenants/*/secrets.yaml
-tenants/*/secrets.yml
-tenants/*/.env
-tenants/*/uploads/
-tenants/*/logs/
-
 # Temporary files
 tmp/
 temp/
