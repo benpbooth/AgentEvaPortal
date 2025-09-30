@@ -1,0 +1,103 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+.eggs/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+.next/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# OS generated files
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build artifacts
+*.tgz
+*.tar.gz
+
+# Cache
+.cache/
+.parcel-cache/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/
+*.lcov
+.nyc_output
+
+# Upload directories
+uploads/
+public/uploads/
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Tenant-specific sensitive files - NEVER COMMIT
+tenants/*/secrets.yaml
+tenants/*/secrets.yml
+tenants/*/.env
+tenants/*/uploads/
+tenants/*/logs/
+
+# Temporary files
+tmp/
+temp/
+.local/

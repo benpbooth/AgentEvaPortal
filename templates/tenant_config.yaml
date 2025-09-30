@@ -1,0 +1,208 @@
+# Tenant Configuration Template
+# This file is used as a template when creating new tenants
+
+# Tenant Information
+tenant:
+  slug: "{slug}"
+  name: "{name}"
+  domain: "{domain}"
+
+# Branding Configuration
+branding:
+  primary_color: "#007bff"
+  secondary_color: "#6c757d"
+  accent_color: "#28a745"
+  logo_url: "https://example.com/logo.png"
+  favicon_url: "https://example.com/favicon.ico"
+  font_family: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+  widget_position: "bottom-right"  # bottom-right, bottom-left, top-right, top-left
+  widget_size: "medium"  # small, medium, large
+  custom_css: ""
+
+# AI Configuration
+ai:
+  model: "gpt-4"
+  temperature: 0.7
+  max_tokens: 500
+  top_p: 1.0
+  frequency_penalty: 0.0
+  presence_penalty: 0.0
+
+  # System prompt template (variables: {business_name}, {business_phone}, {business_email}, {business_hours})
+  system_prompt: |
+    You are a helpful customer support assistant for {business_name}.
+
+    Your role is to:
+    - Answer customer questions accurately and professionally
+    - Provide information about our services and products
+    - Help customers with common issues
+    - Escalate complex issues to human agents when necessary
+
+    Business Information:
+    - Phone: {business_phone}
+    - Email: {business_email}
+    - Hours: {business_hours}
+
+    Always be polite, professional, and helpful. If you don't know something, be honest and offer to connect them with a human agent.
+
+  # Fallback responses
+  fallback_responses:
+    - "I'm not sure I understand. Could you rephrase that?"
+    - "I don't have that information right now. Would you like me to connect you with a human agent?"
+    - "Let me help you with that. Can you provide more details?"
+
+# Business Information
+business:
+  phone: "+1-555-0100"
+  email: "support@example.com"
+  website: "https://example.com"
+  address: "123 Main Street, City, State 12345"
+
+  # Business hours (24-hour format)
+  hours:
+    monday: "09:00-17:00"
+    tuesday: "09:00-17:00"
+    wednesday: "09:00-17:00"
+    thursday: "09:00-17:00"
+    friday: "09:00-17:00"
+    saturday: "10:00-14:00"
+    sunday: "closed"
+    timezone: "America/New_York"
+
+  # Escalation rules
+  escalation:
+    keywords:
+      - "speak to manager"
+      - "human agent"
+      - "talk to person"
+      - "cancel subscription"
+      - "refund"
+      - "complaint"
+
+    confidence_threshold: 0.6  # Escalate if AI confidence below this
+    message_threshold: 5  # Escalate if conversation exceeds this many exchanges
+
+    escalation_message: "I'll connect you with a human agent who can better assist you. Please hold for a moment."
+
+# Features
+features:
+  chat: true
+  email: true
+  voice: false
+  sms: false
+  analytics: true
+  knowledge_base: true
+  file_upload: true
+  sentiment_analysis: true
+  multilingual: false
+
+# Integrations
+integrations:
+  # CRM Integration
+  crm:
+    type: "none"  # salesforce, hubspot, zendesk, custom, none
+    enabled: false
+    config:
+      api_key: ""
+      endpoint: ""
+
+  # Booking/Scheduling
+  booking:
+    type: "none"  # calendly, acuity, custom, none
+    enabled: false
+    config:
+      api_key: ""
+      calendar_url: ""
+
+  # Payment Processing
+  payment:
+    type: "none"  # stripe, square, paypal, none
+    enabled: false
+    config:
+      api_key: ""
+      webhook_secret: ""
+
+  # Email Provider
+  email:
+    type: "smtp"  # smtp, sendgrid, mailgun, ses
+    enabled: true
+    config:
+      from_address: "support@example.com"
+      from_name: "{name}"
+
+  # Webhooks
+  webhooks:
+    enabled: false
+    endpoints:
+      conversation_started: ""
+      conversation_ended: ""
+      message_received: ""
+      escalation_requested: ""
+
+# Rate Limiting
+rate_limiting:
+  messages_per_minute: 20
+  messages_per_hour: 100
+  messages_per_day: 500
+  concurrent_conversations: 10
+
+# Analytics & Tracking
+analytics:
+  track_conversations: true
+  track_messages: true
+  track_escalations: true
+  track_sentiment: true
+
+  # Goals and thresholds
+  goals:
+    resolution_rate: 0.85  # Target: 85% of conversations resolved without escalation
+    avg_response_time_ms: 2000  # Target: 2 seconds average response time
+    csat_target: 4.5  # Target: 4.5 out of 5 customer satisfaction score
+
+  # Retention
+  retention:
+    conversations_days: 365  # Keep conversation data for 1 year
+    messages_days: 365
+    analytics_days: 730  # Keep analytics for 2 years
+
+# Knowledge Base Configuration
+knowledge_base:
+  auto_update: true
+  similarity_threshold: 0.75  # Minimum similarity score for KB matches
+  max_results: 3
+  source_attribution: true  # Include source references in responses
+  categories:
+    - "General FAQ"
+    - "Product Information"
+    - "Billing & Payments"
+    - "Technical Support"
+    - "Account Management"
+
+# Widget Configuration
+widget:
+  greeting_message: "Hi! How can I help you today?"
+  placeholder_text: "Type your message..."
+  show_agent_avatar: true
+  show_timestamps: true
+  enable_emoji: true
+  enable_markdown: true
+  enable_file_upload: true
+  allowed_file_types: [".pdf", ".jpg", ".png", ".txt"]
+  max_file_size_mb: 10
+
+  # Offline behavior
+  offline_message: "We're currently offline. Leave us a message and we'll get back to you!"
+  offline_form_enabled: true
+
+  # CSAT Survey
+  csat_enabled: true
+  csat_trigger: "conversation_end"  # conversation_end, manual
+  csat_question: "How would you rate your experience today?"
+
+# Notifications
+notifications:
+  email_notifications: true
+  escalation_emails:
+    - "support@example.com"
+  daily_summary: true
+  weekly_report: true
