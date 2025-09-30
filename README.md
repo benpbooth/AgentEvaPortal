@@ -4,14 +4,14 @@ A production-ready multi-tenant AI-powered customer support platform. Each clien
 
 ## Features
 
-- 🤖 **AI-Powered Chat**: OpenAI-powered conversational AI with context awareness
-- 🏢 **Multi-Tenant Architecture**: Complete tenant isolation with custom configurations
-- 📊 **Analytics & Insights**: Track conversations, resolution rates, and customer satisfaction
-- 🎨 **Customizable Branding**: Per-tenant themes, colors, and styling
-- 📚 **Knowledge Base**: Vector-based knowledge retrieval using Pinecone
-- 🔄 **Smart Escalation**: Automatic escalation based on keywords, confidence, and conversation length
-- 🔐 **Secure by Default**: API key authentication, rate limiting, and tenant isolation
-- 📱 **Embeddable Widget**: Easy integration into any website
+- AI-Powered Chat**: OpenAI-powered conversational AI with context awareness
+- Multi-Tenant Architecture**: Complete tenant isolation with custom configurations
+- Analytics & Insights**: Track conversations, resolution rates, and customer satisfaction
+- Customizable Branding**: Per-tenant themes, colors, and styling
+- Knowledge Base**: Vector-based knowledge retrieval using Pinecone
+- Smart Escalation: Automatic escalation based on keywords, confidence, and conversation length
+- Secure by Default: API key authentication, rate limiting, and tenant isolation
+- Embeddable Widget: Easy integration into any website
 
 ## Project Structure
 
