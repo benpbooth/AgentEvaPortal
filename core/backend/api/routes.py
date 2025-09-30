@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from core.backend.services.chat_service import ChatService
 from core.backend.services.retrieval_service import RetrievalService
 from core.backend.services.database_service import DatabaseService
+from core.backend.utils.security import verify_api_key, hash_api_key
 from core.database.base import get_db
 from core.database.models import Tenant, KnowledgeDoc
 from core.shared.config_loader import TenantConfig
@@ -92,6 +93,13 @@ class KnowledgeDocListResponse(BaseModel):
     total: int
 
 
+class WidgetConfigResponse(BaseModel):
+    """Widget configuration response for embedding."""
+
+    branding: Dict = Field(..., description="Branding configuration (colors, logo, etc.)")
+    features: Dict = Field(default_factory=dict, description="Enabled features")
+
+
 # Dependency: Verify API Key and Get Tenant
 async def verify_api_key_and_get_tenant(
     tenant_id: str,
@@ -119,13 +127,31 @@ async def verify_api_key_and_get_tenant(
             headers={"WWW-Authenticate": "ApiKey"},
         )
 
-    # Verify API key against database
-    tenant = db.query(Tenant).filter(
-        Tenant.slug == tenant_id,
-        Tenant.api_key == x_api_key
-    ).first()
+    # Get tenant by slug
+    tenant = db.query(Tenant).filter(Tenant.slug == tenant_id).first()
 
     if not tenant:
+        logger.warning(f"Tenant not found: {tenant_id}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key or tenant not found",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+    # Verify API key - support both hashed and plaintext for migration
+    key_valid = False
+
+    if tenant.api_key_hash:
+        # Use secure hash comparison if available
+        key_valid = verify_api_key(x_api_key, tenant.api_key_hash)
+    elif tenant.api_key == x_api_key:
+        # Fallback to plaintext comparison for backwards compatibility
+        key_valid = True
+        # Optionally: Auto-migrate to hashed key
+        # tenant.api_key_hash = hash_api_key(x_api_key)
+        # db.commit()
+
+    if not key_valid:
         logger.warning(f"Invalid API key for tenant: {tenant_id}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -476,3 +502,58 @@ async def delete_knowledge_doc(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error deleting document"
         )
+
+
+# ============================================================================
+# Widget Configuration Endpoint
+# ============================================================================
+
+@router.get(
+    "/{tenant_id}/widget/config",
+    response_model=WidgetConfigResponse,
+    tags=["Widget"],
+    summary="Get widget configuration",
+    description="Get branding and configuration for embeddable widget"
+)
+async def get_widget_config(
+    tenant_id: str,
+    x_api_key: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+) -> WidgetConfigResponse:
+    """
+    Get widget configuration including branding.
+
+    This endpoint is called by the widget JavaScript to fetch
+    tenant-specific branding and settings.
+
+    Args:
+        tenant_id: Tenant identifier (slug)
+        x_api_key: Tenant API key for authentication
+        db: Database session
+
+    Returns:
+        WidgetConfigResponse with branding and features
+    """
+    tenant = await verify_api_key_and_get_tenant(tenant_id, x_api_key, db)
+
+    logger.info(f"Widget config request for tenant: {tenant_id}")
+
+    # Extract branding from tenant config
+    config = tenant.config or {}
+    branding = config.get('branding', {
+        'primary_color': '#667eea',
+        'secondary_color': '#764ba2',
+        'company_name': tenant.name,
+        'welcome_message': 'Hi! How can we help you today?',
+        'logo_url': '',
+        'widget_position': 'bottom-right'
+    })
+
+    features = config.get('channels', {
+        'web': {'enabled': True}
+    })
+
+    return WidgetConfigResponse(
+        branding=branding,
+        features=features
+    )

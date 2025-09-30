@@ -88,7 +88,39 @@ class MessageRole(str, enum.Enum):
 
 
 class Tenant(Base):
-    """Tenant model - represents a client/organization."""
+    """
+    Tenant model - represents a client/organization.
+
+    Config JSON structure:
+    {
+        "branding": {
+            "logo_url": "https://...",
+            "primary_color": "#667eea",
+            "secondary_color": "#764ba2",
+            "company_name": "Acme Corp",
+            "support_email": "support@acme.com",
+            "welcome_message": "How can we help?",
+            "widget_position": "bottom-right"
+        },
+        "ai_config": {
+            "model": "gpt-4o-mini",
+            "temperature": 0.7,
+            "max_tokens": 500,
+            "system_prompt": "You are a helpful assistant...",
+            "escalation_keywords": ["human", "speak to person"]
+        },
+        "channels": {
+            "web": {"enabled": true},
+            "sms": {"enabled": false, "phone_number": "+1..."},
+            "voice": {"enabled": false, "phone_number": "+1..."},
+            "email": {"enabled": false, "support_email": "..."}
+        },
+        "rate_limits": {
+            "requests_per_minute": 60,
+            "custom_limits": {}
+        }
+    }
+    """
 
     __tablename__ = "tenants"
 
@@ -103,7 +135,8 @@ class Tenant(Base):
         default=TenantStatus.TRIAL,
         index=True,
     )
-    api_key = Column(String(255), unique=True, nullable=False, index=True)
+    api_key = Column(String(255), unique=True, nullable=False, index=True)  # Plaintext for backwards compatibility
+    api_key_hash = Column(String(64), nullable=True, index=True)  # SHA-256 hash for secure storage
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(
         DateTime,

@@ -9,9 +9,13 @@ import uvicorn
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from core.backend.api.routes import router as api_router
+from core.backend.api.webhooks import router as webhook_router
 from core.backend.config import get_settings
+from core.backend.middleware.rate_limiter import rate_limit_middleware
 
 # Configure logging
 logging.basicConfig(
@@ -52,6 +56,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Rate limiting middleware
+app.middleware("http")(rate_limit_middleware)
 
 
 # Request timing middleware
@@ -104,6 +112,12 @@ async def root() -> Dict[str, str]:
 
 # Include API routes
 app.include_router(api_router, prefix="/api")
+app.include_router(webhook_router)  # Webhooks at /webhooks
+
+# Serve widget files
+widget_path = Path(__file__).parent.parent.parent / "widget"
+if widget_path.exists():
+    app.mount("/widget", StaticFiles(directory=str(widget_path)), name="widget")
 
 
 if __name__ == "__main__":
